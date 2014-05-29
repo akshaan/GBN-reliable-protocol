@@ -14,11 +14,10 @@ int main(int argc, char* argv[])
 	int err, socketfd, infd, flag = 0, yes = 1;
 	socklen_t addr_size;
 	struct sockaddr_storage in_addr;
-	char buff[6] = "Hello";
 	int sendlen;
 
-	if(argc < 3){
-		printf("Usage: ./client server_hostname server_port_number\n");
+	if(argc < 4){
+		printf("Usage: ./client server_hostname server_port_number filename\n");
 		exit(1);
 	}
 
@@ -61,7 +60,7 @@ int main(int argc, char* argv[])
 
 		printf("Sending file request\n");		
 		
-		if((sendlen = sendto(socketfd,buff,5,0,ptr->ai_addr, ptr->ai_addrlen)) == -1){
+		if((sendlen = sendto(socketfd,argv[3],strlen(argv[3]),0,ptr->ai_addr, ptr->ai_addrlen)) == -1){
 			perror("sendto");
 			exit(1);		
 

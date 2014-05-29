@@ -1,6 +1,4 @@
-#define PORT 22222 
-#define BACKLOG 5
-#define REQ_BUF_SIZ 1024
+#define MAX_PACKET_SIZ 1024
  
 #define GETADDR_ERR 1
 #define SOCK_ERR 2

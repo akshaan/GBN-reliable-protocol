@@ -6,23 +6,28 @@
 #include <stdlib.h>
 #include "constants.h"
 #include <unistd.h>
+#include <cmath>
 
 int main(int argc, char* argv[])
 {
+	/* Defs and Inits */
 	struct addrinfo hints;
 	struct addrinfo* res, *ptr;
-	int err, socketfd, infd, flag = 0, yes = 1;
+	int err, socketfd, infd, flag = 0, recvlen, numpackets, base, congwin; 
 	socklen_t addr_size;
 	struct sockaddr_storage in_addr;
-	char buff[REQ_BUF_SIZ];
-	int recvlen;
-
-	if(argc < 2){
-		printf("Usage: ./server port_number\n");
+	char buff[MAX_PACKET_SIZ];
+	FILE* fp;
+	long int sz;
+	
+	
+	/* Check for required args */
+	if(argc < 3){
+		printf("Usage: ./server port_number congestion_window_size\n");
 		exit(1);
 	}
 
-
+	/* Get addrinfo */
 	bzero(&hints, sizeof(hints));
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_flags = AI_PASSIVE;
@@ -51,7 +56,7 @@ int main(int argc, char* argv[])
 		exit(SOCK_ERR);
 	}
 
-
+	/* Bind to socket */
 	if(bind(socketfd, ptr->ai_addr, ptr->ai_addrlen) == -1)
 	{
 		fprintf(stderr, "Failed to bind to socket\n");
@@ -59,20 +64,39 @@ int main(int argc, char* argv[])
 	}
 
 	freeaddrinfo(res);
-
 	addr_size = sizeof in_addr;
 
-		printf("Waiting for file request\n");
-
-		if((recvlen = recvfrom(socketfd,buff,REQ_BUF_SIZ-1,0,(struct sockaddr*)&in_addr, &addr_size)) == -1){
+	/* Begin receive-send loop */
+	printf("Waiting for file request\n");
+	while(1){
+		/* Receive request */
+		if((recvlen = recvfrom(socketfd,buff,MAX_PACKET_SIZ,0,(struct sockaddr*)&in_addr,\
+		&addr_size)) == -1)
+		{
 			perror("recvfrom");
 			exit(1);		
 
 		}
+		
+		/* Open requested resource and find number of packets required */
+		fp = fopen(buff, "rb");
+		if(!fp){
+			fprintf(stderr, "Failed to open requested file\n");
+			exit(1);
+		}
+		fseek(fp, 0 , SEEK_END);
+		sz = ftell(fp);
+		fseek(fp, 0 , SEEK_SET);	
+		numpackets = ceil((float)sz/MAX_PACKET_SIZ);
+					
+		/* Set base and congestion window*/
+		base = 0;
+		congwin = argv[2]; 
 
+		printf("%d\n",numpackets);		
+		}
 
-		else printf("%s\n",buff);		
-
+	
 		close(socketfd);
 		return 0;
 
