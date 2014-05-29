@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <cmath>
 #include "segment.c"
+#include <sys/fcntl.h>
 
 int main(int argc, char* argv[])
 {
@@ -58,6 +59,8 @@ int main(int argc, char* argv[])
 		exit(SOCK_ERR);
 	}
 
+	fcntl(socketfd,F_SETFL, O_NONBLOCK);
+
 	/* Bind to socket */
 	if(bind(socketfd, ptr->ai_addr, ptr->ai_addrlen) == -1)
 	{
@@ -68,24 +71,21 @@ int main(int argc, char* argv[])
 	addr_size = sizeof in_addr;
 
 	/* Begin receive-send loop */
-	printf("Waiting for file request\n");
+	printf("\nWaiting for file request\n\n");
 	while(1){
 		/* Receive request */
 		segment seg;
-		if((recvlen = recvfrom(socketfd,&seg,sizeof(segment),0,(struct sockaddr*)&in_addr,\
+		while((recvlen = recvfrom(socketfd,&seg,sizeof(segment),0,(struct sockaddr*)&in_addr,\
 		&addr_size)) == -1)
-		{
-			perror("recvfrom");
-			exit(1);		
-
-		}
+		{		}
 		
 		/* Get request from received segment */
 		segment req;
 		memcpy(&req,&seg,sizeof(segment));
-		printf("DATA received seq#%d, ACK#%d, FIN %d, content-length: %d\n",\
+		printf("DATA received seq#%d, ACK#%d, FIN %d, content-length: %d\n\n",\
 			req.seq_no,req.ack_no,req.fin,req.data_len);
 		
+		printf("File requested is %s\n\n....................\n\n", req.data);		
 
 		/* Open requested resource and find number of packets required */
 		fp = fopen(req.data, "rb");
@@ -98,11 +98,11 @@ int main(int argc, char* argv[])
 		fseek(fp, 0 , SEEK_SET);	
 		numpackets = ceil((float)sz/MAX_PACKET_SIZ);
 	
-			
 		/* Set base and congestion window */
 		base = 0;
 		congwin = atoi(argv[2]);
-
+		printf("%d",congwin);
+		currack = req.data_len;
 
 		
 		/* Allocate array of segments and buffer to read in the file */
@@ -115,17 +115,20 @@ int main(int argc, char* argv[])
 		
 		}		
 		/* Send packets in sets of size congwin */
-		int flag2 = 0;
+	
 		int remain = sz;
 		while(1){
 			
 			for(int i = 0; i < congwin; ++i)
 			{
+				if(remain <= 0)
+					break;
+			
 				segment s;
+				printf("%d",i);
 				int sendsiz = MAX_PACKET_SIZ;
 				if(remain - MAX_PACKET_SIZ <= 0){
 					sendsiz = remain;
-					flag2 = 1;
 				}
 				build_segment(&s,currseq,currack,sendsiz,temp+(sz-remain),0);
 
@@ -134,12 +137,11 @@ int main(int argc, char* argv[])
 					perror("sendto");
 					exit(1);
 				}
-		
-			if(flag == 1) break;
+				
+				remain -= sendsiz;				
 			
 			}	
 
-			break;
 		}
 	}	
 		close(socketfd);

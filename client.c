@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include "constants.h"
 #include <unistd.h>
+#include <sys/fcntl.h>
 #include "segment.c"
 
 int main(int argc, char* argv[])
@@ -50,28 +51,26 @@ int main(int argc, char* argv[])
 		exit(SOCK_ERR);
 	}
 
-
+	fcntl(socketfd,F_SETFL,O_NONBLOCK);
 
 
 
 	segment req;
 	build_segment(&req,0,0,strlen(argv[3]),argv[3],0);
-	printf("Sending request to server.\n");		
+	printf("Sending request to server.\n\n");		
 	if((sendlen = sendto(socketfd,&req,sizeof(segment),0,ptr->ai_addr, ptr->ai_addrlen)) == -1){
-			perror("sendto");
-			exit(1);		
+		//	perror("sendto");
+		//	exit(1);		
 
 	}
 
 	addr_size = sizeof in_addr;	
 	while(1){
 		segment rsp;
-		if((recvfrom(socketfd,&rsp,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size)) == -1){
-			perror("recvfrom");
-			exit(1);
-		}
+		while((recvfrom(socketfd,&rsp,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size)) == -1)
+		{		}
 
-		printf("DATA received seq#%d, ACK#%d, FIN %d, content-length: %d\n",\
+		printf("DATA received seq#%d, ACK#%d, FIN %d, content-length: %d\n\n",\
 			rsp.seq_no,req.ack_no,rsp.fin,rsp.data_len);			
 
 	}
