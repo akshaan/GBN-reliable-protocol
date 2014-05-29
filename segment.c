@@ -10,3 +10,13 @@ typedef struct {
 	char data[MAX_PACKET_SIZ];
 	char fin;
 } segment;
+
+void build_segment(segment* seg,int s, int a, int len, char* dat, char f)
+{
+	seg->seq_no = s;
+	seg->ack_no = a;
+	seg->data_len = len;
+	memcpy(&seg->data, dat, sizeof(char)*MAX_PACKET_SIZ);
+	seg->fin = f;
+}
+	

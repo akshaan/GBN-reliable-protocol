@@ -7,18 +7,20 @@
 #include "constants.h"
 #include <unistd.h>
 #include <cmath>
+#include "segment.c"
 
 int main(int argc, char* argv[])
 {
 	/* Defs and Inits */
 	struct addrinfo hints;
 	struct addrinfo* res, *ptr;
-	int err, socketfd, infd, flag = 0, recvlen, numpackets, base, congwin; 
+	int err, socketfd, infd, flag = 0, recvlen, numpackets, base = 0, congwin, currack = 0, currseq = 0; 
 	socklen_t addr_size;
 	struct sockaddr_storage in_addr;
 	char buff[MAX_PACKET_SIZ];
 	FILE* fp;
 	long int sz;
+	segment* window;
 	
 	
 	/* Check for required args */
@@ -62,15 +64,15 @@ int main(int argc, char* argv[])
 		fprintf(stderr, "Failed to bind to socket\n");
 		exit(BIND_ERR);
 	}
-
-	freeaddrinfo(res);
+	
 	addr_size = sizeof in_addr;
 
 	/* Begin receive-send loop */
 	printf("Waiting for file request\n");
 	while(1){
 		/* Receive request */
-		if((recvlen = recvfrom(socketfd,buff,MAX_PACKET_SIZ,0,(struct sockaddr*)&in_addr,\
+		segment seg;
+		if((recvlen = recvfrom(socketfd,&seg,sizeof(segment),0,(struct sockaddr*)&in_addr,\
 		&addr_size)) == -1)
 		{
 			perror("recvfrom");
@@ -78,8 +80,15 @@ int main(int argc, char* argv[])
 
 		}
 		
+		/* Get request from received segment */
+		segment req;
+		memcpy(&req,&seg,sizeof(segment));
+		printf("DATA received seq#%d, ACK#%d, FIN %d, content-length: %d\n",\
+			req.seq_no,req.ack_no,req.fin,req.data_len);
+		
+
 		/* Open requested resource and find number of packets required */
-		fp = fopen(buff, "rb");
+		fp = fopen(req.data, "rb");
 		if(!fp){
 			fprintf(stderr, "Failed to open requested file\n");
 			exit(1);
@@ -88,15 +97,51 @@ int main(int argc, char* argv[])
 		sz = ftell(fp);
 		fseek(fp, 0 , SEEK_SET);	
 		numpackets = ceil((float)sz/MAX_PACKET_SIZ);
-					
-		/* Set base and congestion window*/
-		base = 0;
-		congwin = argv[2]; 
-
-		printf("%d\n",numpackets);		
-		}
-
 	
+			
+		/* Set base and congestion window */
+		base = 0;
+		congwin = atoi(argv[2]);
+
+
+		
+		/* Allocate array of segments and buffer to read in the file */
+		window = (segment*)malloc(numpackets * sizeof(segment));
+		char* temp = (char*)malloc(sz*sizeof(char));
+		if(fread(temp,1,sz,fp) != sz){
+			fprintf(stderr,"Error reading file");
+			exit(1);
+
+		
+		}		
+		/* Send packets in sets of size congwin */
+		int flag2 = 0;
+		int remain = sz;
+		while(1){
+			
+			for(int i = 0; i < congwin; ++i)
+			{
+				segment s;
+				int sendsiz = MAX_PACKET_SIZ;
+				if(remain - MAX_PACKET_SIZ <= 0){
+					sendsiz = remain;
+					flag2 = 1;
+				}
+				build_segment(&s,currseq,currack,sendsiz,temp+(sz-remain),0);
+
+				if(sendto(socketfd,&s,sizeof(segment),0,(struct sockaddr*)&in_addr, addr_size)\
+					 ==-1){
+					perror("sendto");
+					exit(1);
+				}
+		
+			if(flag == 1) break;
+			
+			}	
+
+			break;
+		}
+	}	
 		close(socketfd);
 		return 0;
 
