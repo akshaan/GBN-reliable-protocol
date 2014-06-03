@@ -16,7 +16,7 @@ int main(int argc, char* argv[])
 	int err, socketfd, infd, flag = 0, yes = 1;
 	socklen_t addr_size;
 	struct sockaddr_storage in_addr;
-	int sendlen;
+	int sendlen, currseq = 0;
 
 	if(argc < 4){
 		printf("Usage: ./client server_hostname server_port_number filename\n");
@@ -59,22 +59,61 @@ int main(int argc, char* argv[])
 	build_segment(&req,0,0,strlen(argv[3]),argv[3],0);
 	printf("Sending request to server.\n\n");		
 	if((sendlen = sendto(socketfd,&req,sizeof(segment),0,ptr->ai_addr, ptr->ai_addrlen)) == -1){
-		//	perror("sendto");
-		//	exit(1);		
+			perror("sendto");
+			exit(1);		
 
 	}
 
 	addr_size = sizeof in_addr;	
+	segment rsp;
 	while(1){
-		segment rsp;
-		while((recvfrom(socketfd,&rsp,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size)) == -1)
-		{		}
+	
+		if((recvfrom(socketfd,&rsp,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size)) != -1)
+		{		
+				printf("DATA received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
+					rsp.seq_no,rsp.ack_no,rsp.fin,rsp.data_len);
+			
+				currseq = rsp.ack_no +1;
 
-		printf("DATA received seq#%d, ACK#%d, FIN %d, content-length: %d\n\n",\
-			rsp.seq_no,req.ack_no,rsp.fin,rsp.data_len);			
+				if(rsp.fin == 1)
+					break;	
+
+		/* Send ACK for received data packets */			
+			segment ack;
+			build_segment(&ack,currseq,rsp.seq_no+rsp.data_len,0,NULL,0);
+			if(sendto(socketfd,&ack,sizeof(segment),0,(struct sockaddr*)&in_addr,addr_size) == -1)
+			{
+				perror("sendto");
+				exit(1);
+			}
+
+			printf("ACK sent seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",
+					 	ack.seq_no, ack.ack_no, ack.fin, ack.data_len);
+		}
 
 	}
-		
+
+	/* Close connection */
+		segment finack;
+		build_segment(&finack,rsp.ack_no,rsp.seq_no+1,0,NULL,1);
+		if(sendto(socketfd,&finack,sizeof(segment),0,(struct sockaddr*)&in_addr,addr_size) == -1){
+			perror("sendto");
+			exit(1);
+		}
+
+		printf("FINACK sent seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",
+		              finack.seq_no, finack.ack_no, finack.fin, finack.data_len);
+
+
+		segment finack2;
+		while(recvfrom(socketfd,&finack2,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size) == -1)
+		{		}
+
+		printf("FINACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",    	
+                      	finack2.seq_no, finack2.ack_no, finack2.fin, finack2.data_len);
+
+		printf("Closed connection\n\n");
+	
 	freeaddrinfo(res);
 	close(socketfd);
 	return(0);
