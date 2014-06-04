@@ -225,7 +225,8 @@ int main(int argc, char* argv[])
 				   printf("ACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 					 	ack.seq_no,ack.ack_no, ack.fin, ack.data_len);
 				
-				
+			
+		
 				
 				/* Slide window forward and send next packet */
 		
@@ -248,7 +249,9 @@ int main(int argc, char* argv[])
 			//		timeout.tv_sec = 5;	
 					break;
 								
-				  }			
+				  }	
+
+				break;		
 					
 			     }
 
