@@ -19,8 +19,6 @@ bool isCorrupt(float prob)
         srand(time(NULL));
         float random = (float)(rand())/(float)(RAND_MAX);
 
-	printf("%f\n\n",random);
-
         if(random < prob){
                 return true;
 	}
@@ -109,7 +107,7 @@ int main(int argc, char* argv[])
 		if((recvfrom(socketfd,&rsp,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size)) != -1)
 		{		
 			segment ack;
-			if(rsp.seq_no == expseq && !isCorrupt(prob_corr)){
+			if(rsp.seq_no == expseq && !isCorrupt(prob_corr) && !isLost(prob_loss)){
 				printf("DATA received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 					rsp.seq_no,rsp.ack_no,rsp.fin,rsp.data_len);
 			

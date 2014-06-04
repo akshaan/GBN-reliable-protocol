@@ -24,6 +24,17 @@ bool isCorrupt(float prob)
 	else return false;
 }
 
+bool isLost(float prob)
+{
+	srand(time(NULL));
+	float random = (float)(rand())/(float)(RAND_MAX); 
+
+	if(random < prob)
+		return true;
+	else return false;
+}
+
+
 int main(int argc, char* argv[])
 {
 
@@ -38,17 +49,18 @@ int main(int argc, char* argv[])
 	long int sz;
 	vector<segment> window;
 	vector<segment> packets;
-	float prob_corr;	
+	float prob_corr,prob_loss;	
 	int lastack = 0;
 	
 	/* Check for required args */
-	if(argc < 4){
-		printf("Usage: ./server port_number congestion_window_size prob_corruption\n");
+	if(argc < 5){
+		printf("Usage: ./server port_number congestion_window_size prob_loss prob_corruption\n");
 		exit(1);
 	}
 
 	/* Initialize corruption and loss probabilities */
-	prob_corr = atof(argv[3]);
+	prob_corr = atof(argv[4]);
+	prob_loss = atof(argv[3]);
 
 	/* Get addrinfo */
 	bzero(&hints, sizeof(hints));
@@ -180,11 +192,14 @@ int main(int argc, char* argv[])
 		      timeout.tv_sec = 5;
 	              if(select(socketfd+1, &readfds,NULL,NULL, &timeout) == 0)
 		      {
-		         for(int i = base; i < base+congwin; ++i)
+			 printf("(ACK lost or corrupted) Timeout\n\n");
+		         for(int i = base; i < min(base+congwin,(int)packets.size()); ++i)
 			 {
 					sendto(socketfd,&packets[i],sizeof(segment),0,(struct sockaddr*)\
 									&in_addr,addr_size);
 
+
+					
 					printf("DATA sent seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 							packets[i].seq_no,packets[i].ack_no,packets[i].fin,\
 											packets[i].data_len);
@@ -204,13 +219,13 @@ int main(int argc, char* argv[])
 			 recvfrom(socketfd,&ack,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size);
 			 
 			    
-			    if(ack.ack_no > lastack){
+			    if(ack.ack_no > lastack && !isLost(prob_loss) && !isCorrupt(prob_corr)){
 				   
 				   lastack = ack.ack_no;
 				   printf("ACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 					 	ack.seq_no,ack.ack_no, ack.fin, ack.data_len);
 				
-
+				
 				
 				/* Slide window forward and send next packet */
 		
@@ -229,19 +244,17 @@ int main(int argc, char* argv[])
 										 next.data_len);
 				
 					currseq += next.data_len;	
-					
-
-				   }
-
 				   
-					timeout.tv_sec = 5;	
-											
+			//		timeout.tv_sec = 5;	
+					break;
+								
+				  }			
 					
 			     }
 
 			
 			else {
-				printf("ACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
+				//printf("ACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 					ack.seq_no,ack.ack_no, ack.fin, ack.data_len);
 				FD_ZERO(&readfds);
 				FD_SET(socketfd, &readfds);
