@@ -19,10 +19,26 @@ bool isCorrupt(float prob)
         srand(time(NULL));
         float random = (float)(rand())/(float)(RAND_MAX);
 
-        if(random < prob)
+	printf("%f\n\n",random);
+
+        if(random < prob){
                 return true;
+	}
         else return false;
 }
+
+
+bool isLost(float prob)
+{
+        srand(time(NULL));
+        float random = (float)(rand())/(float)(RAND_MAX);
+
+        if(random < prob){	
+                return true;
+	}
+        else return false;
+}
+
 
 
 int main(int argc, char* argv[])
@@ -36,14 +52,16 @@ int main(int argc, char* argv[])
 	vector<segment> packets;
 	int expseq = 0;
 	float prob_corr;
+	float prob_loss;
 
-	if(argc < 5){
-		printf("Usage: ./client server_hostname server_port_number filename prob_corruption\n");
+	if(argc < 6){
+		printf("Usage: ./client server_hostname server_port_number filename prob_loss prob_corruption\n");
 		exit(1);
 	}
 
 
-	prob_corr = atof(argv[4]);
+	prob_loss = atof(argv[4]);
+	prob_corr = atof(argv[5]);
 	bzero(&hints, sizeof(hints));
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_family = AF_UNSPEC;
@@ -91,7 +109,7 @@ int main(int argc, char* argv[])
 		if((recvfrom(socketfd,&rsp,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size)) != -1)
 		{		
 			segment ack;
-			//if(!isCorrupt(prob_corr) && rsp.seq_no == expseq){
+			if(rsp.seq_no == expseq && !isCorrupt(prob_corr)){
 				printf("DATA received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 					rsp.seq_no,rsp.ack_no,rsp.fin,rsp.data_len);
 			
@@ -101,14 +119,20 @@ int main(int argc, char* argv[])
 					break;
 				build_segment(&ack,currseq,rsp.seq_no+rsp.data_len,0,NULL,0);
 				expseq = rsp.seq_no + rsp.data_len;	
-			//}
+			}
 
 
-		/*	else{
+			else{
+				if(rsp.fin == 1)
+					break;
+			
+	printf("POOP received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
+		rsp.seq_no,rsp.ack_no,rsp.fin,rsp.data_len);
+
+			
 				printf("Packet lost or corrupted\n\n");
-				build_segment(&ack,currseq,rsp.seq_no,0,NULL,0);
-				expseq = rsp.seq_no;
-			}*/
+				build_segment(&ack,currseq,expseq,0,NULL,0);
+			}
 				
 		/* Send ACK for received data packets */			
 		
@@ -147,7 +171,14 @@ int main(int argc, char* argv[])
 		printf("Closed connection\n\n");
 
 		/* Write packets to file */
-
+		FILE* fp = fopen("test.txt","w");
+		for(int j = 0; j < packets.size(); ++j)
+		{
+			for(int i = 0; i < packets[j].data_len; i++)
+			{
+				fputc(packets[j].data[i],fp);
+			}
+		}
 	
 	freeaddrinfo(res);
 	close(socketfd);

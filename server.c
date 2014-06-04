@@ -39,7 +39,7 @@ int main(int argc, char* argv[])
 	vector<segment> window;
 	vector<segment> packets;
 	float prob_corr;	
-	int expack = 0;
+	int lastack = 0;
 	
 	/* Check for required args */
 	if(argc < 4){
@@ -92,7 +92,7 @@ int main(int argc, char* argv[])
 
 	/* Begin receive-send loop */
 	
-	while(1){
+
 
 		printf("\nWaiting for file request\n\n");
 		/* Receive request */
@@ -167,43 +167,97 @@ int main(int argc, char* argv[])
 		segment ack;
 		while(1){	
 			
-			if(recvfrom(socketfd,&ack,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size) != -1)
-			{
+		   fd_set readfds;
+		   struct timeval timeout;
+		   timeout.tv_sec = 5;
+		   timeout.tv_usec = 0;
+		   FD_ZERO(&readfds);
+		   FD_SET(socketfd, &readfds);
+		   int success = 0;
+		   while(1)
+		   {  
+
+		      timeout.tv_sec = 5;
+	              if(select(socketfd+1, &readfds,NULL,NULL, &timeout) == 0)
+		      {
+		         for(int i = base; i < base+congwin; ++i)
+			 {
+					sendto(socketfd,&packets[i],sizeof(segment),0,(struct sockaddr*)\
+									&in_addr,addr_size);
+
+					printf("DATA sent seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
+							packets[i].seq_no,packets[i].ack_no,packets[i].fin,\
+											packets[i].data_len);
+							
+			 }
+
+
+		//	timeout.tv_sec = 5;
+		//	timeout.tv_usec = 0;
+			break;
+
+		     }
+	
+
+		     else {
 			
-				printf("ACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
+			 recvfrom(socketfd,&ack,sizeof(segment),0,(struct sockaddr*)&in_addr,&addr_size);
+			 
+			    
+			    if(ack.ack_no > lastack){
+				   
+				   lastack = ack.ack_no;
+				   printf("ACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 					 	ack.seq_no,ack.ack_no, ack.fin, ack.data_len);
 				
 
 				
 				/* Slide window forward and send next packet */
 		
-						base = ceil((float)ack.ack_no/MAX_PACKET_SIZ) - 1;
-						currack++;
-						printf("Sliding window\n\n");
+				   base = ceil((float)ack.ack_no/MAX_PACKET_SIZ) - 1;
+				   currack++;
+				   printf("Sliding window\n\n");
 		
-					if(!(base+congwin > packets.size())){	
-						segment next = packets[base+congwin];
-						if(sendto(socketfd,&next,sizeof(segment),0,(struct sockaddr*)\
-							&in_addr,addr_size) == -1){
+				   if(!(base+congwin >= packets.size()))
+				   {	
+					segment next = packets[base+congwin];
+					sendto(socketfd,&next,sizeof(segment),0,(struct sockaddr*)\
+							&in_addr,addr_size);	
 
-							perror("sendto");
-							exit(1);
-						}			
-
-	printf("DATA sent seq# %d, ACK# %d, FIN %d, content-length:%d\n\n", next.seq_no, next.ack_no, next.fin,\
+					printf("DATA sent seq# %d, ACK# %d, FIN %d, content-length:%d\n\n",\
+ 									next.seq_no, next.ack_no, next.fin,\
 										 next.data_len);
-
-					
-					}	
 				
-						if(base == numpackets -1 ) break;	
-				}
+					currseq += next.data_len;	
+					
+
+				   }
+
+				   
+					timeout.tv_sec = 5;	
+											
+					
+			     }
+
+			
+			else {
+				printf("ACK received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
+					ack.seq_no,ack.ack_no, ack.fin, ack.data_len);
+				FD_ZERO(&readfds);
+				FD_SET(socketfd, &readfds);
+				
 			
 			}
-		/* After every window sent, wait for timeout */
-
+			
 	
 		
+}}
+			if(base == numpackets -1) break;
+}		
+
+	
+	
+	close:
 		printf("File transfer complete\n\n");
 
 		/* Close connection */
@@ -234,7 +288,7 @@ int main(int argc, char* argv[])
 			        	finack2.seq_no,finack2.ack_no,finack2.fin,finack2.data_len);
 
 		printf("Closed connection\n\n");		
-	}	
+
 		close(socketfd);
 		return 0;
 
