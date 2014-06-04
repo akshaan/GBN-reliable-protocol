@@ -177,6 +177,7 @@ int main(int argc, char* argv[])
 				fputc(packets[j].data[i],fp);
 			}
 		}
+		fclose(fp);
 	
 	freeaddrinfo(res);
 	close(socketfd);

@@ -145,7 +145,7 @@ int main(int argc, char* argv[])
 
 		
 		}		
-		
+		fclose(fp);	
 		int remain = sz;
 		while(remain > 0)
 		{
