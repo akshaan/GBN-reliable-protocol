@@ -193,17 +193,18 @@ int main(int argc, char* argv[])
 	printf("DATA sent seq# %d, ACK# %d, FIN %d, content-length:%d\n\n", next.seq_no, next.ack_no, next.fin,\
 										 next.data_len);
 
-					
-					}	
+						expack = next.seq_no + next.data_len;
+					}
 				
 						if(base == numpackets -1 ) break;	
 				}
+
 			
 			}
 		/* After every window sent, wait for timeout */
 
-	
-		
+		}
+
 		printf("File transfer complete\n\n");
 
 		/* Close connection */
