@@ -124,7 +124,7 @@ int main(int argc, char* argv[])
 				if(rsp.fin == 1)
 					break;
 			
-	printf("POOP received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
+//	printf("POOP received seq# %d, ACK# %d, FIN %d, content-length: %d\n\n",\
 		rsp.seq_no,rsp.ack_no,rsp.fin,rsp.data_len);
 
 			
@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 		printf("Closed connection\n\n");
 
 		/* Write packets to file */
-		FILE* fp = fopen("test.txt","w");
+		FILE* fp = fopen(argv[3],"w");
 		for(int j = 0; j < packets.size(); ++j)
 		{
 			for(int i = 0; i < packets[j].data_len; i++)

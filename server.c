@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
 	char buff[MAX_PACKET_SIZ];
 	FILE* fp;
 	long int sz;
-	vector<segment> window;
+	//vector<segment> window;
 	vector<segment> packets;
 	float prob_corr,prob_loss;	
 	int lastack = 0;
@@ -104,8 +104,8 @@ int main(int argc, char* argv[])
 
 	/* Begin receive-send loop */
 	
-
-
+	begin:
+		packets.clear();	
 		printf("\nWaiting for file request\n\n");
 		/* Receive request */
 		segment seg;
@@ -134,8 +134,10 @@ int main(int argc, char* argv[])
 		
 		/* Set base and congestion window */
 		base = 0;
+		lastack = 0;
 		congwin = atoi(argv[2]);	
-		currack = req.data_len+1;	
+		currack = req.data_len+1;
+		currseq = 0;	
 	
 		/* Allocate buffer to read in the file */
 		char* temp = (char*)malloc(sz*sizeof(char));
@@ -305,6 +307,7 @@ int main(int argc, char* argv[])
 
 		printf("Closed connection\n\n");		
 
+		goto begin;
 		close(socketfd);
 		return 0;
 
